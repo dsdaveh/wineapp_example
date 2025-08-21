@@ -29,7 +29,7 @@ ui <- fluidPage(
                 column(4,
                     selectInput("varietals", "Select Varietals:",
                                choices = varietal_choices,
-                               selected = "Fortified",
+                               selected = varietal_choices,
                                multiple = TRUE),
                     
                     selectInput("start_year", "Start Year:",
@@ -65,23 +65,30 @@ ui <- fluidPage(
                     p("Uses the date range from Visualize tab as training data, with 12-month forecast horizon."),
                     
                     fluidRow(
-                        column(4,
+                        column(3,
                             selectInput("metric_choice", "Select Metric:",
                                        choices = c("RMSE", "MAPE"),
                                        selected = "RMSE")
                         ),
-                        column(4,
+                        column(3,
                             selectInput("sort_varietal", "Sort by Varietal:",
                                        choices = NULL,  # Will be updated dynamically
                                        selected = NULL)
                         ),
-                        column(4,
+                        column(3,
                             checkboxInput("show_training", "Show Training Metrics", value = TRUE)
+                        ),
+                        column(3,
+                            checkboxInput("show_specs", "Show Model Specifications", value = FALSE)
                         )
                     ),
                     
-                    h5("Model Specifications:"),
-                    verbatimTextOutput("specs_table"),
+                    conditionalPanel(
+                        condition = "input.show_specs",
+                        h5("Model Specifications:"),
+                        verbatimTextOutput("specs_table"),
+                        br()
+                    ),
                     
                     conditionalPanel(
                         condition = "input.show_training",
@@ -106,8 +113,16 @@ ui <- fluidPage(
                     h4("12-Month Forecasts"),
                     p("Forecasts based on models fitted to the date range from Visualize tab."),
                     
-                    numericInput("confidence_level", "Confidence Level (%):",
-                                value = 95, min = 50, max = 99, step = 1),
+                    fluidRow(
+                        column(6,
+                            numericInput("confidence_level", "Confidence Level (%):",
+                                        value = 95, min = 50, max = 99, step = 1)
+                        ),
+                        column(6,
+                            numericInput("years_display", "Years of Actual Data to Display:",
+                                        value = 2, min = 1, max = 10, step = 1)
+                        )
+                    ),
                     
                     plotOutput("forecast_plot", height = "600px")
                 )
@@ -356,24 +371,31 @@ server <- function(input, output, session) {
                 theme_void()
         } else {
             data <- filtered_data()
+            n_varietals <- length(unique(data$Varietal))
             
             # Generate forecasts from the models
             forecasts <- results$models |> forecast(h = 12)
             
-            # Create the forecast plot faceted by varietal
+            # Trim data for display based on selected years
+            display_data <- data |>
+                group_by(Varietal) |>
+                slice_tail(n = 12 * input$years_display) |>
+                ungroup()
+            
+            # Create the forecast plot faceted by model and varietal
             forecasts |>
                 autoplot(level = input$confidence_level) +
-                facet_wrap(~ Varietal, scales = "free_y") +
-                autolayer(data, Sales, color = "black") +
+                facet_grid(.model ~ Varietal, scales = "free_y") +
+                autolayer(display_data, Sales, color = "black") +
                 labs(
                     title = paste("12-Month Forecasts with", input$confidence_level, "% Confidence Intervals"),
                     x = "Month",
-                    y = "Sales (thousands of liters)",
-                    color = "Model"
+                    y = "Sales (thousands of liters)"
                 ) +
+                guides(color = "none") +
                 theme(
                     axis.text.x = element_text(angle = 45, hjust = 1),
-                    legend.position = "bottom"
+                    legend.position = "none"
                 )
         }
     })

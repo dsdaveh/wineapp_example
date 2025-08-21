@@ -4060,6 +4060,9 @@
   "files": {
     "app.R": {
       "checksum": "102030103d2223fe6904ed46d3e4b290"
+    },
+    "data/AustralianWines.csv": {
+      "checksum": "6c734f279c3e6227df9f0c4ed086ec2a"
     }
   },
   "users": null

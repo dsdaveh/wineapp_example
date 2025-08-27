@@ -1,8 +1,10 @@
 library(tidyverse)
 library(shiny)
 library(fpp3)
+library(urca)
 library(here)
 library(gt)
+library(markdown)  # Add this line
 
 # Load and prepare data
 aus_wine <- read_csv(here("data", "AustralianWines.csv"), na = "*",
@@ -125,6 +127,18 @@ ui <- fluidPage(
                     ),
                     
                     plotOutput("forecast_plot", height = "600px")
+                )
+            )
+        ),
+        
+        # About Tab
+        tabPanel("About",
+            fluidRow(
+                column(12,
+                    div(
+                        includeMarkdown("about.md"),
+                        style = "margin-top: 20px;"
+                    )
                 )
             )
         )

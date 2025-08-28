@@ -4,7 +4,8 @@ library(fpp3)
 library(urca)
 library(here)
 library(gt)
-library(markdown)  # Add this line
+library(markdown)
+library(patchwork)  
 
 # Load and prepare data
 aus_wine <- read_csv(here("data", "AustralianWines.csv"), na = "*",
@@ -158,25 +159,51 @@ server <- function(input, output, session) {
         aus_wine |>
             filter(Varietal %in% input$varietals,
                    Month >= start_date,
-                   Month <= end_date)
+                   Month <= end_date) 
+        
+    })
+    
+    # Create total of selected varietals
+    total_data <- reactive({
+        data <- filtered_data()
+        req(nrow(data) > 0)
+        
+        data |>
+            index_by(Month) |>  # Use index_by() instead of group_by() for tsibbles
+            summarize(Sales = sum(Sales, na.rm = TRUE), .groups = "drop") |>
+            mutate(Varietal = "Total of Selected") |>
+            as_tibble()  # Convert back to regular tibble for plotting
     })
     
     # Time series plot
     output$time_series_plot <- renderPlot({
         data <- filtered_data()
-        req(nrow(data) > 0)
+        total <- total_data()
+        req(nrow(data) > 0, nrow(total) > 0)
         
-        p <- data |>
+        # Main faceted plot
+        p1 <- data |>
             ggplot(aes(x = Month, y = Sales)) +
             geom_line() +
             facet_wrap(~ Varietal, scales = if(input$free_y) "free_y" else "fixed") +
-            labs(title = "Australian Wine Sales",
+            labs(title = "Australian Wine Sales by Varietal",
                  x = "Month",
                  y = "Sales (thousands of liters)") +
             theme(axis.text.x = element_text(angle = 45, hjust = 1))
         
-        p
-    })
+        # Total plot
+        p2 <- total |>
+            ggplot(aes(x = Month, y = Sales)) +
+            geom_line(color = "blue", linewidth = 1) +
+            geom_smooth(method = "loess", se = TRUE, color = "red", alpha = 0.3) +
+            labs(title = "Total of Selected Varietals",
+                 x = "Month",
+                 y = "Sales (thousands of liters)") +
+            theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        
+        # Combine plots vertically using patchwork
+        p1 / p2 + plot_layout(heights = c(3, 1))
+    }, height = 650)  # Increase height to accommodate both plots
     
     # Update sort varietal choices based on selected varietals
     observe({
